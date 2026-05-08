@@ -1,0 +1,22 @@
+[browser]
+gatherUsageStats = false
+
+[server]
+# Cap uploads (MB) for audio/images in this app; raise if you need longer recordings.
+maxUploadSize = 50
+
+[theme]
+# Modern, high-contrast, readable theme
+base = "dark"
+primaryColor = "#6D5EFc"
+backgroundColor = "#0B1020"
+secondaryBackgroundColor = "#121A33"
+textColor = "#EAF0FF"
+# Instagram-inspired (pink/purple) theme
+base = "light"
+primaryColor = "#E1306C"               # Instagram pink
+backgroundColor = "#FFF7FB"            # soft pink-white
+secondaryBackgroundColor = "#F3F0FF"   # light lavender
+textColor = "#1F1F29"                  # near-black
+font = "sans serif"
+[client]
