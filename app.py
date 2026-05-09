@@ -44,6 +44,32 @@ def _normalize_secret_value(value: object) -> str | None:
     return s or None
 
 
+def _load_local_secrets() -> dict[str, object]:
+    """Load local secrets from disk (dev convenience).
+
+    Streamlit Cloud uses `st.secrets` and does not rely on these files.
+    Locally, this allows password protection even if `.streamlit/secrets.toml`
+    can't be created (e.g., name collision with an existing folder).
+    """
+    candidates = [
+        os.path.join(".streamlit", "secrets.toml"),
+        os.path.join(".streamlit", "secrets.local.toml"),
+    ]
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "rb") as f:
+                data = tomllib.load(f)
+            return data if isinstance(data, dict) else {}
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+    return {}
+
+
+_LOCAL_SECRETS = _load_local_secrets()
+
+
 def _secret_or_env(name: str) -> str | None:
     """Read a scalar secret from secrets.toml when present; fall back to the same-named env var."""
     try:
@@ -51,6 +77,8 @@ def _secret_or_env(name: str) -> str | None:
             return _normalize_secret_value(st.secrets[name])
     except StreamlitSecretNotFoundError:
         pass
+    if name in _LOCAL_SECRETS:
+        return _normalize_secret_value(_LOCAL_SECRETS.get(name))
     return _normalize_secret_value(os.getenv(name))
 
 
@@ -108,15 +136,7 @@ def _rgba(hex_color: str, alpha: float) -> str:
 
 
 def _branding_from_secrets_file() -> dict[str, object]:
-    path = os.path.join(".streamlit", "secrets.toml")
-    if not os.path.isfile(path):
-        return {}
-    try:
-        with open(path, "rb") as f:
-            data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
-    b = data.get("branding")
+    b = _LOCAL_SECRETS.get("branding") if isinstance(_LOCAL_SECRETS, dict) else None
     return dict(b) if isinstance(b, dict) else {}
 
 
