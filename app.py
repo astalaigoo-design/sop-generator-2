@@ -21,12 +21,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-st.set_page_config(page_title="SOP Generator", layout="wide")
-
 DEFAULT_BRANDING: dict[str, object] = {
     "app_name": "Professional SOP Generator",
     "tagline": "Powered by Groq",
     "page_title": "SOP Generator",
+    "page_icon": "🚀",
     "logo_url": "",
     "logo_path": "",
     "primary_color": "#E1306C",
@@ -140,6 +139,7 @@ def _branding_env_overrides() -> dict[str, object]:
         "BRAND_APP_NAME": "app_name",
         "BRAND_TAGLINE": "tagline",
         "BRAND_PAGE_TITLE": "page_title",
+        "BRAND_PAGE_ICON": "page_icon",
         "BRAND_LOGO_URL": "logo_url",
         "BRAND_LOGO_PATH": "logo_path",
         "BRAND_PRIMARY_COLOR": "primary_color",
@@ -158,6 +158,27 @@ def _branding_env_overrides() -> dict[str, object]:
     return out
 
 
+def get_initial_branding() -> dict[str, object]:
+    """Branding safe to compute before the first Streamlit command.
+
+    Used for st.set_page_config so the favicon/tab icon can be customized.
+    """
+    merged: dict[str, object] = dict(DEFAULT_BRANDING)
+    merged.update({k: v for k, v in _branding_from_secrets_file().items() if k in _BRANDING_KEYS})
+    merged.update(_branding_env_overrides())
+    merged["page_icon"] = str(merged.get("page_icon") or DEFAULT_BRANDING["page_icon"])
+    merged["page_title"] = str(merged.get("page_title") or DEFAULT_BRANDING["page_title"])
+    return merged
+
+
+_initial_brand = get_initial_branding()
+st.set_page_config(
+    page_title=str(_initial_brand.get("page_title")),
+    page_icon=str(_initial_brand.get("page_icon")),
+    layout="wide",
+)
+
+
 def get_branding() -> dict[str, object]:
     merged: dict[str, object] = dict(DEFAULT_BRANDING)
     merged.update({k: v for k, v in _branding_from_secrets_file().items() if k in _BRANDING_KEYS})
@@ -174,6 +195,7 @@ def get_branding() -> dict[str, object]:
         merged.get("accent_color"), str(DEFAULT_BRANDING["accent_color"])
     )
     merged["hide_powered_by"] = _coerce_bool(merged.get("hide_powered_by"), False)
+    merged["page_icon"] = str(merged.get("page_icon") or DEFAULT_BRANDING["page_icon"])
     return merged
 
 
