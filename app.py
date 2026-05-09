@@ -221,10 +221,11 @@ def build_branding_css(brand: dict[str, object]) -> str:
 <style>
 /* ---- White-label UI (brand colors) ---- */
 .stApp {{
-  background: radial-gradient(1200px 600px at 10% 10%, {_rgba(pr, 0.14)}, transparent 60%),
-              radial-gradient(900px 600px at 90% 20%, {_rgba(sec, 0.16)}, transparent 55%),
-              radial-gradient(900px 700px at 50% 90%, {_rgba(ac, 0.14)}, transparent 60%),
-              linear-gradient(180deg, rgba(255, 247, 251, 1) 0%, rgba(243, 240, 255, 1) 100%);
+  /* Dark, muted base so the app doesn't feel overly bright */
+  background: radial-gradient(900px 500px at 10% 10%, {_rgba(pr, 0.10)}, transparent 60%),
+              radial-gradient(800px 520px at 90% 20%, {_rgba(sec, 0.10)}, transparent 55%),
+              radial-gradient(900px 600px at 50% 90%, {_rgba(ac, 0.08)}, transparent 60%),
+              linear-gradient(180deg, #0B0F1A 0%, #0A0D14 100%);
   background-size: 120% 120%;
   animation: bgShift 14s ease-in-out infinite;
 }}
@@ -236,9 +237,9 @@ def build_branding_css(brand: dict[str, object]) -> str:
 }}
 
 section[data-testid="stSidebar"] > div {{
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(18, 24, 39, 0.72);
   backdrop-filter: blur(10px);
-  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
 }}
 
 div.block-container {{
@@ -273,8 +274,8 @@ div[data-baseweb="select"] > div {{
 
 div[data-testid="stExpander"] {{
   border-radius: 16px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(18, 24, 39, 0.55);
   backdrop-filter: blur(10px);
 }}
 
@@ -1579,3 +1580,4 @@ if api_key and candidate_sop_for_flowchart:
             file_name="sop-flowchart.mmd",
             mime="text/plain",
         )
+
