@@ -1349,6 +1349,7 @@ if generate:
                         data=pdf_bytes,
                         file_name=f"{safe_name}.pdf",
                         mime="application/pdf",
+                        key=f"dl_pdf_gen_{sop_fingerprint(sop_for_download)}",
                     )
             with col_b:
                 if docx_bytes:
@@ -1357,6 +1358,7 @@ if generate:
                         data=docx_bytes,
                         file_name=f"{safe_name}.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key=f"dl_docx_gen_{sop_fingerprint(sop_for_download)}",
                     )
 
             st.markdown("### Rate this SOP")
@@ -1419,6 +1421,7 @@ if current_sop:
             data=current_pdf,
             file_name=f"{safe_name}.pdf",
             mime="application/pdf",
+            key=f"dl_pdf_current_{sop_fingerprint(current_sop)}",
         )
 
 
@@ -1507,6 +1510,7 @@ if api_key and last_sop:
                     data=pdf_bytes,
                     file_name=f"{safe_name}-revised.pdf",
                     mime="application/pdf",
+                    key=f"dl_pdf_rev_{sop_fingerprint(sop_for_download)}",
                 )
         with col_d:
             if docx_bytes:
@@ -1515,6 +1519,7 @@ if api_key and last_sop:
                     data=docx_bytes,
                     file_name=f"{safe_name}-revised.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"dl_docx_rev_{sop_fingerprint(sop_for_download)}",
                 )
 
         st.markdown("### Rate the revised SOP")
