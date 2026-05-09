@@ -22,9 +22,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 DEFAULT_BRANDING: dict[str, object] = {
-    "app_name": "Professional SOP Generator",
+    "app_name": "Fluency",
     "tagline": "Powered by Groq",
-    "page_title": "SOP Generator",
+    "page_title": "Fluency",
     "page_icon": "🚀",
     "logo_url": "",
     "logo_path": "",
@@ -1580,4 +1580,3 @@ if api_key and candidate_sop_for_flowchart:
             file_name="sop-flowchart.mmd",
             mime="text/plain",
         )
-
