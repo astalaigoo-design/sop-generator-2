@@ -23,15 +23,15 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 DEFAULT_BRANDING: dict[str, object] = {
     "app_name": "Fluency",
-    "tagline": "Powered by Groq",
+    "tagline": "Capture expertise in a snap",
     "page_title": "Fluency",
-    "page_icon": "🚀",
+    "page_icon": "🗣️",
     "logo_url": "",
     "logo_path": "",
     "primary_color": "#E1306C",
     "secondary_color": "#833AB4",
     "accent_color": "#FCAF45",
-    "hide_powered_by": False,
+    "hide_powered_by": True,
 }
 
 _BRANDING_KEYS = frozenset(DEFAULT_BRANDING.keys())
