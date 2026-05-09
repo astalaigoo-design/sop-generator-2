@@ -964,7 +964,22 @@ with st.sidebar:
         st.session_state.profile_compliance = str(profile.get("compliance_standard", "") or "")
         st.session_state.profile_tone = str(profile.get("tone", "Professional") or "Professional")
 
-    st.image(logo_url, width=160)
+    st.markdown("## Professional Edition")
+
+    _has_custom_logo = bool(str(_brand.get("logo_url") or "").strip() or str(_brand.get("logo_path") or "").strip())
+    if _has_custom_logo:
+        st.image(logo_url, width=160)
+    else:
+        st.markdown(
+            """
+<div style="border: 1px dashed rgba(255,255,255,0.22); border-radius: 16px; padding: 18px; text-align: center; background: rgba(255,255,255,0.04);">
+  <div style="font-weight: 700; letter-spacing: 0.04em; opacity: 0.9;">LOGO</div>
+  <div style="margin-top: 6px; font-size: 12px; opacity: 0.7;">Upload / configure a logo</div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
     st.markdown(f"**{str(_brand.get('app_name') or DEFAULT_BRANDING['app_name'])}**")
     st.markdown("### How to use")
     st.info(
@@ -1277,6 +1292,8 @@ if generate:
                 )
                 st.session_state.last_sop_text = sop_text
                 st.session_state.last_inferred_topic = inferred_topic
+                # Always set the "current" SOP so it persists across any subsequent button clicks.
+                st.session_state.current_sop_text = sop_text
 
                 add_to_history(
                     {
@@ -1295,9 +1312,6 @@ if generate:
         if sop_text:
             st.subheader("Generated SOP")
             st.markdown(sop_text)
-
-            if "current_sop_text" not in st.session_state:
-                st.session_state.current_sop_text = sop_text
 
             with st.expander("Interactive Step Editor (edit inside the app)", expanded=False):
                 st.caption("Edit the SOP here, then download the edited version.")
@@ -1382,6 +1396,30 @@ if generate:
                     }
                 )
                 st.success("Thanks — feedback saved.")
+
+
+# --- Persistent SOP display (state management) ---
+current_sop = (st.session_state.get("current_sop_text") or "").strip()
+if current_sop:
+    st.divider()
+    st.subheader("Current SOP")
+    st.markdown(current_sop)
+
+    inferred_topic = str(st.session_state.get("last_inferred_topic") or "sop")
+    safe_name = "".join(c for c in inferred_topic.strip() if c.isalnum() or c in (" ", "-", "_")).strip() or "sop"
+    try:
+        current_pdf = create_pdf_bytes(current_sop)
+    except Exception:
+        current_pdf = b""
+        show_busy_error()
+
+    if current_pdf:
+        st.download_button(
+            "Download PDF",
+            data=current_pdf,
+            file_name=f"{safe_name}.pdf",
+            mime="application/pdf",
+        )
 
 
 # --- Step 2: Quality pass (Review & Fix) ---
