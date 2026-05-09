@@ -13,6 +13,8 @@ from io import BytesIO
 import streamlit.components.v1 as components
 import hashlib
 from datetime import datetime, timezone
+from pathlib import Path
+import traceback
 from fpdf import FPDF
 from groq import Groq
 from docx import Document
@@ -407,6 +409,26 @@ def sop_fingerprint(text: str) -> str:
     return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
 
 
+REQUIRED_SOP_HEADERS = ["## Title", "## Purpose", "## Roles", "## Procedures"]
+
+
+def is_valid_sop_markdown(md: str) -> bool:
+    """Validate SOP uses exactly the required H2 headers, in order."""
+    text = (md or "").strip()
+    if not text:
+        return False
+    # Must include required headers in order.
+    pos = -1
+    for h in REQUIRED_SOP_HEADERS:
+        nxt = text.find(h)
+        if nxt < 0 or nxt <= pos:
+            return False
+        pos = nxt
+    # Must not include any other H2 headers.
+    h2_lines = [ln.strip() for ln in text.splitlines() if ln.strip().startswith("## ")]
+    return h2_lines == REQUIRED_SOP_HEADERS
+
+
 def _chunk_text(text: str, *, chunk_chars: int = 900, overlap_chars: int = 150) -> list[str]:
     t = (text or "").strip()
     if not t:
@@ -513,6 +535,7 @@ def get_groq_api_key() -> str | None:
 COMPANY_PROFILE_PATH = os.path.join(".streamlit", "company_profile.json")
 FEEDBACK_PATH = os.path.join(".streamlit", "feedback.jsonl")
 HISTORY_PATH = os.path.join(".streamlit", "history.json")
+APP_LOG_PATH = os.path.join(".streamlit", "app.log")
 
 
 def load_company_profile() -> dict:
@@ -532,8 +555,22 @@ def save_company_profile(profile: dict) -> None:
         json.dump(profile, f, ensure_ascii=False, indent=2)
 
 
-def show_busy_error() -> None:
-    st.error("The system is busy. Please try again in a few seconds.")
+def log_exception(ex: Exception, *, context: str) -> None:
+    """Write exception details to a local log file for support/debugging."""
+    try:
+        os.makedirs(os.path.dirname(APP_LOG_PATH), exist_ok=True)
+        with open(APP_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(f"\n[{datetime.now(timezone.utc).isoformat()}] {context}\n")
+            f.write("".join(traceback.format_exception(type(ex), ex, ex.__traceback__)))
+    except Exception:
+        # Never let logging break the app UX.
+        pass
+
+
+def show_busy_error(ex: Exception | None = None, *, context: str = "Unhandled error") -> None:
+    if ex is not None:
+        log_exception(ex, context=context)
+    st.error("Something went wrong. Please try again. If this continues, contact support.")
 
 
 def append_feedback(entry: dict) -> None:
@@ -744,6 +781,42 @@ def generate_sop_cached(
             {"role": "user", "content": prompt},
         ],
         temperature=float(temperature),
+    )
+    return completion.choices[0].message.content or ""
+
+
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=256)
+def format_sop_to_required_markdown_cached(
+    *,
+    api_key: str,
+    model: str,
+    sop_text: str,
+) -> str:
+    """Reformat any SOP-ish text into the required strict Markdown structure."""
+    client = Groq(api_key=api_key)
+    prompt = f"""
+Reformat the SOP content below into STRICT valid Markdown using ONLY these H2 headers, in this exact order:
+1) ## Title
+2) ## Purpose
+3) ## Roles
+4) ## Procedures
+
+Rules:
+- Do not add any other headers (no extra ## sections).
+- Under "## Procedures" use a numbered list (1., 2., 3., ...).
+- Preserve factual content; if something is missing, write "Not specified".
+- Return ONLY the Markdown.
+
+SOP content:
+{sop_text}
+""".strip()
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "You are a meticulous technical editor."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.0,
     )
     return completion.choices[0].message.content or ""
 
@@ -1336,98 +1409,24 @@ if generate:
                     }
                 )
             except Exception as e:
-                show_busy_error()
+                show_busy_error(e, context="Generate SOP")
                 sop_text = ""
 
         if sop_text:
-            st.subheader("Generated SOP")
-            st.markdown(sop_text)
-
-            with st.expander("Interactive Step Editor (edit inside the app)", expanded=False):
-                st.caption("Edit the SOP here, then download the edited version.")
-                edited = st.text_area(
-                    "Edit SOP text",
-                    value=st.session_state.current_sop_text,
-                    height=320,
-                    key=f"editor_gen_{sop_fingerprint(sop_text)}",
-                )
-                col_e1, col_e2 = st.columns(2)
-                with col_e1:
-                    if st.button("Save edits", key=f"save_gen_{sop_fingerprint(sop_text)}"):
-                        st.session_state.current_sop_text = edited
-                        st.success("Edits saved. Downloads will use the edited SOP.")
-                with col_e2:
-                    if st.button("Reset to generated", key=f"reset_gen_{sop_fingerprint(sop_text)}"):
-                        st.session_state.current_sop_text = sop_text
-                        st.success("Reset to the generated SOP.")
-
-            sop_for_download = st.session_state.get("current_sop_text") or sop_text
-            safe_name = "".join(c for c in inferred_topic.strip() if c.isalnum() or c in (" ", "-", "_")).strip() or "sop"
-            try:
-                pdf_bytes = create_pdf_bytes(sop_for_download)
-                docx_bytes = create_docx_bytes(safe_name, sop_for_download)
-            except Exception:
-                pdf_bytes = b""
-                docx_bytes = b""
-                show_busy_error()
-
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if pdf_bytes:
-                    st.download_button(
-                        "Download PDF",
-                        data=pdf_bytes,
-                        file_name=f"{safe_name}.pdf",
-                        mime="application/pdf",
-                        key=f"dl_pdf_gen_{sop_fingerprint(sop_for_download)}",
+            # Enforce strict Markdown structure. If the model drifts, auto-fix it once.
+            if not is_valid_sop_markdown(sop_text):
+                try:
+                    sop_text = format_sop_to_required_markdown_cached(
+                        api_key=api_key,
+                        model=model,
+                        sop_text=sop_text,
                     )
-            with col_b:
-                if docx_bytes:
-                    st.download_button(
-                        "Download DOCX",
-                        data=docx_bytes,
-                        file_name=f"{safe_name}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        key=f"dl_docx_gen_{sop_fingerprint(sop_for_download)}",
-                    )
+                except Exception as e:
+                    show_busy_error(e, context="Format SOP to required Markdown")
 
-            st.markdown("### Rate this SOP")
-            rating = st.radio(
-                "Was this SOP helpful?",
-                ["👍 Thumbs Up", "👎 Thumbs Down"],
-                horizontal=True,
-                key=f"rating_{sop_fingerprint(sop_text)}",
-            )
-            reason = ""
-            if rating.startswith("👎"):
-                reason = st.text_area(
-                    "What should be improved?",
-                    placeholder="e.g., missing roles, unclear steps, wrong order, missing records, too long/short...",
-                    key=f"reason_{sop_fingerprint(sop_text)}",
-                )
-            if st.button("Submit feedback", key=f"submit_{sop_fingerprint(sop_text)}"):
-                append_feedback(
-                    {
-                        "ts": datetime.now(timezone.utc).isoformat(),
-                        "rating": "up" if rating.startswith("👍") else "down",
-                        "reason": reason.strip(),
-                        "template_name": template_name,
-                        "strictness": strictness,
-                        "tone": tone,
-                        "compliance_standard": compliance_standard or "",
-                        "audience": (audience or "").strip(),
-                        "tools_used": (tools_used or "").strip(),
-                        "include_definitions": bool(include_definitions),
-                        "include_safety_compliance": bool(include_safety_compliance),
-                        "include_records": bool(include_records),
-                        "include_checklist": bool(include_checklist),
-                        "model": model,
-                        "temperature": float(temperature),
-                        "notes_chars": len((notes or "").strip()),
-                        "sop_sha256": sop_fingerprint(sop_text),
-                    }
-                )
-                st.success("Thanks — feedback saved.")
+            st.session_state.last_sop_text = sop_text
+            st.session_state.current_sop_text = sop_text
+            st.success("SOP generated. See 'Current SOP' below.")
 
 
 # --- Persistent SOP display (state management) ---
@@ -1441,18 +1440,48 @@ if current_sop:
     safe_name = "".join(c for c in inferred_topic.strip() if c.isalnum() or c in (" ", "-", "_")).strip() or "sop"
     try:
         current_pdf = create_pdf_bytes(current_sop)
-    except Exception:
+        current_docx = create_docx_bytes(safe_name, current_sop)
+    except Exception as e:
         current_pdf = b""
-        show_busy_error()
+        current_docx = b""
+        show_busy_error(e, context="Prepare current SOP downloads")
 
-    if current_pdf:
-        st.download_button(
-            "Download PDF",
-            data=current_pdf,
-            file_name=f"{safe_name}.pdf",
-            mime="application/pdf",
-            key=f"dl_pdf_current_{sop_fingerprint(current_sop)}",
+    with st.expander("Edit SOP (client-ready)", expanded=False):
+        edited_current = st.text_area(
+            "Edit SOP text",
+            value=current_sop,
+            height=320,
+            key=f"editor_current_{sop_fingerprint(current_sop)}",
         )
+        col_ec1, col_ec2 = st.columns(2)
+        with col_ec1:
+            if st.button("Save edits", key=f"save_current_{sop_fingerprint(current_sop)}"):
+                st.session_state.current_sop_text = edited_current
+                st.success("Edits saved.")
+        with col_ec2:
+            if st.button("Reset to last generated", key="reset_current_to_last"):
+                st.session_state.current_sop_text = st.session_state.get("last_sop_text", "") or current_sop
+                st.success("Reset.")
+
+    col_dl1, col_dl2 = st.columns(2)
+    with col_dl1:
+        if current_pdf:
+            st.download_button(
+                "Download PDF",
+                data=current_pdf,
+                file_name=f"{safe_name}.pdf",
+                mime="application/pdf",
+                key=f"dl_pdf_current_{sop_fingerprint(current_sop)}",
+            )
+    with col_dl2:
+        if current_docx:
+            st.download_button(
+                "Download DOCX",
+                data=current_docx,
+                file_name=f"{safe_name}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key=f"dl_docx_current_{sop_fingerprint(current_sop)}",
+            )
 
 
 # --- Step 2: Quality pass (Review & Fix) ---
