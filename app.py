@@ -664,23 +664,16 @@ Common issues to avoid (from user feedback on previous SOPs):
         "Include tips, examples, and clarifying notes where helpful."
     )
 
-    section_lines = [
-        "- Purpose",
-        "- Scope",
-        "- Roles & responsibilities",
-        "- Procedure (numbered)",
-        "- Exceptions / edge cases",
-    ]
-    if include_definitions:
-        section_lines.append("- Definitions (only if needed)")
-    if include_records:
-        section_lines.append("- Records / documentation")
-    if include_safety_compliance:
-        section_lines.append("- Safety / compliance (if relevant)")
-    if include_checklist:
-        section_lines.append("- Checklist (short, at the end)")
-
-    sections_text = "\n".join(section_lines)
+    # System prompt requirement: strict Markdown headers in a fixed order.
+    # Keep this list in sync with prompt instructions below.
+    sections_text = "\n".join(
+        [
+            "1. Title",
+            "2. Purpose",
+            "3. Roles",
+            "4. Procedures",
+        ]
+    )
 
     notes_based_section = ""
     if len((notes or "").strip()) >= 1200:
@@ -701,7 +694,16 @@ If any manual rule conflicts with the user's notes, call out the conflict and ch
 
     return f"""
 Write a clear, professional Standard Operating Procedure (SOP) for the topic below.
-Use crisp headings and numbered steps. Keep it practical and immediately actionable.
+
+OUTPUT FORMAT (STRICT):
+- Output MUST be valid Markdown.
+- Use ONLY these H2 headers, in this exact order (spelling/case must match):
+  1) ## Title
+  2) ## Purpose
+  3) ## Roles
+  4) ## Procedures
+- Do NOT add any other headers (no extra ## sections).
+- Under "## Procedures" use a numbered list (1., 2., 3., ...).
 
 Target audience: {audience}
 Tools/systems used: {tools_used or "Not specified"}
@@ -715,7 +717,7 @@ Tone: {tone}
 
 {notes_based_section}
 
-Required sections (include ONLY these; omit all others):
+Required headers (include ONLY these; omit all others):
 {sections_text}
 
 Template-specific guidance:
@@ -769,6 +771,14 @@ Goals:
 - If there is a "Based on notes:" section, keep it and correct it to match the SOP (do not add new facts).
 
 Output rules:
+- Output MUST be valid Markdown.
+- Use ONLY these H2 headers, in this exact order (spelling/case must match):
+  1) ## Title
+  2) ## Purpose
+  3) ## Roles
+  4) ## Procedures
+- Do NOT add any other headers (no extra ## sections).
+- Under "## Procedures" use a numbered list (1., 2., 3., ...).
 - Return ONLY the revised SOP (no analysis, no bullet list of issues).
 - Use the same tone: {tone}
 - Use strictness: {strictness}
